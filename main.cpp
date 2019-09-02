@@ -49,7 +49,7 @@ ModeData modeDatas[Mode::LEN] = {
     { "Russian",     "Latin-Russian/BGN" },
     { "Ukrainian",   "Latin-Russian/BGN" },
     { "Greek",       "Latin-Greek" },
-    { "GreekUNGEGN", "Latin-Greek/UNGEGN" },
+    { "Greek UNGEGN", "Latin-Greek/UNGEGN" },
     { "Latin",       "Russian-Latin/BGN; Greek-Latin/UNGEGN; Latin" },
 };
 
@@ -60,7 +60,7 @@ void drawTopBar(Mode mode) {
     //vline(' ', modeStrLength* Mode::LEN);
     for (int i = 0; i < Mode::LEN; ++i) {
         auto& s = modeDatas[i].name;
-        int left = (modeStrLength+ s.size())/2 - 2;//; + s.size();
+        int left = (modeStrLength+ s.size())/2 - 3;//; + s.size();
         attron(COLOR_PAIR(1));
         mvprintw(0, i * modeStrLength, "|");
         attron(COLOR_PAIR(1 + (i == mode)));
@@ -160,10 +160,11 @@ UnicodeString readClip() {
 void initColor() {
     if (!has_colors()) return;
     start_color();
+    int bg_col = (use_default_colors() == OK) ? -1: COLOR_BLACK;
     init_pair(2, COLOR_BLACK, COLOR_WHITE);
-    init_pair(1, COLOR_WHITE, COLOR_BLACK);
+    init_pair(1, COLOR_WHITE, bg_col);
 }
-int main() {
+int main(int argc, int* argv[]) {
     Mode mode = Mode::Russian;
     icu::UnicodeString res;// = icu::UnicodeString::fromUTF8(s);
     std::string out;
@@ -182,23 +183,26 @@ int main() {
     meta(stdscr, true);
     //curs_set(0);
     initColor();
+    bool debugMode = argc >= 2;
 
     updateScreen(cursor, res, out, mode);
     int c = 0;
     bool escape = false;
-    //int i = 4;
+    int i = 4;
     while ((c = getch())) {
         if (escape) {
-            if (c >= '0' && c <= '0'+ Mode::LEN) {
-                mode = Mode(c- '0'-1);
+            if (c >= '1' && c <= '1'+ Mode::LEN) {
+                mode = Mode(c- '1');
             }
             escape = false;
             updateScreen(cursor, res, out, mode);
             continue;
         }
         //endwin();
-        //printf("'%c' %d\n", c, c);
-        //mvprintw(i++, 0, "'%c' %d\n", c, c);
+        if (debugMode) {
+            printf("'%c' %d\n", c, c);
+            mvprintw(i++, 0, "'%c' %d\n", c, c);
+        }
         switch (c) {
         case 27: // esc
             escape = true;
