@@ -6,54 +6,91 @@
 #include <unicode/errorcode.h>
 #include <unicode/translit.h>
 #include <stdio.h>
+
 #ifndef CTRL
 #define CTRL(c) ((c) & 037)
 #endif
+
+using icu::Transliterator;
+using icu::UnicodeString;
+
+struct ModeData {
+    std::string name;
+private:
+    const char* transliteratorID;
+    Transliterator* converter;
+public:
+    ModeData(std::string name, const char* transliteratorID):
+        name(name), transliteratorID(transliteratorID), converter(nullptr) {}
+
+    Transliterator* getConverter() {
+        if (converter == nullptr) {
+            icu::ErrorCode result;
+            converter = Transliterator::createInstance(transliteratorID, UTRANS_FORWARD, result);
+            if (result.isFailure())
+                throw std::runtime_error(
+                    "instantiation of transliterator instance failed with "
+                    + std::string(result.errorName()));
+        }
+        return converter;
+    }
+};
+
 enum Mode {
     Russian,
     Ukrainian,
     Greek,
+    GreekUNGEGN,
+    Latin,
 
     LEN
 };
+ModeData modeDatas[Mode::LEN] = {
+    { "Russian",     "Latin-Russian/BGN" },
+    { "Ukrainian",   "Latin-Russian/BGN" },
+    { "Greek",       "Latin-Greek" },
+    { "GreekUNGEGN", "Latin-Greek/UNGEGN" },
+    { "Latin",       "Russian-Latin/BGN; Greek-Latin/UNGEGN; Latin" },
+};
 
-icu::Transliterator* converters[3] = {0};
+constexpr int modeStrLength = 18;
 
-icu::Transliterator* getTransliterator(const char* str) {
-    icu::ErrorCode result;
-    // using 'Latin; ASCII' instead of 'NFD; [:M:] Remove; NFC' properly
-    // converts 'ł' to 'l'. As a bonus, it converts greek and other
-    // scripts to latin
-    auto r = icu::Transliterator::createInstance(str, UTRANS_FORWARD, result);
-    if (result.isFailure())
-        throw std::runtime_error(
-            "instantiation of transliterator instance failed with "
-            + std::string(result.errorName()));
-    return r;
+void drawTopBar(Mode mode) {
+    //attron(COLOR_PAIR(2));
+    //vline(' ', modeStrLength* Mode::LEN);
+    for (int i = 0; i < Mode::LEN; ++i) {
+        auto& s = modeDatas[i].name;
+        int left = (modeStrLength+ s.size())/2 - 2;//; + s.size();
+        attron(COLOR_PAIR(1));
+        mvprintw(0, i * modeStrLength, "|");
+        attron(COLOR_PAIR(1 + (i == mode)));
+        printw(" %d %*s", i+1, left, s.c_str());
+        int right = modeStrLength - left-3;
+        hline(' ', right);
+    }
+    attron(COLOR_PAIR(1));
+    int x = Mode::LEN * modeStrLength;
+    mvprintw(0, x, "|");
+    mvprintw(1, 0, "|");
+    mvprintw(1, x, "|");
+    mvhline(1, 1, '-', x-1);
 }
 
-void updateScreen(int cursor, const std::string& str, std::string& out, Mode mode) {
-    const char* modeStr;
+void updateScreen(int cursor, const UnicodeString& str, std::string& out, Mode mode) {
+    drawTopBar(mode);
+
+    UnicodeString us = str;//.copy();// icu::UnicodeString::fromUTF8(str);
+
     switch (mode) {
-    case Mode::Russian:   modeStr = "Russian"; break;
-    case Mode::Ukrainian: modeStr = "Ukrainian"; break;
-    case Mode::Greek:     modeStr = "Greek"; break;
-    default: throw std::runtime_error("invalid mode");
+    case Mode::Ukrainian:
+    case Mode::Russian:
+        us.findAndReplace("c", "ц");
+        us.findAndReplace("C", "Ц");
+        break;
+    default: break;
     }
+    modeDatas[mode].getConverter()->transliterate(us);
 
-    auto& converter = converters[mode];
-    if (converter == nullptr) {
-        switch (mode) {
-        case Mode::Russian:   converter = getTransliterator("Latin-Russian/BGN"); break;
-        case Mode::Ukrainian: converter = converters[Mode::Russian]; break;//getTransliterator("Latin-Ukrainian/BGN"); break;
-        case Mode::Greek:     converter = getTransliterator("Latin-Greek"); break;
-        case Mode::LEN: break;
-        }
-    }
-
-    auto us = icu::UnicodeString::fromUTF8(str);
-    converter->transliterate(us);
-    
     switch (mode) {
     case Mode::Ukrainian:
         us.findAndReplace("г", "ґ");
@@ -87,12 +124,14 @@ void updateScreen(int cursor, const std::string& str, std::string& out, Mode mod
     default: break;
     }
     out = std::string();
+    auto tmp = std::string();
+    str.toUTF8String(tmp);
     us.toUTF8String(out);
 
-    mvprintw(0, 0, "%s:            ", modeStr);
-    mvprintw(1, 0, "%s             ", str.c_str());
-    mvprintw(2, 0, "%s             ", out.c_str());
-    move(1, cursor);
+    //mvprintw(0, 0, "%s:            ", modeStr);
+    mvprintw(2, 0, "%s             ", tmp.c_str());
+    mvprintw(3, 0, "%s             ", out.c_str());
+    move(2, cursor);
 }
 
 void writeClip(const char* str) {
@@ -105,9 +144,32 @@ void writeClip(const char* str) {
     fputs(str, fp);
     pclose(fp);
 }
+UnicodeString readClip() {
+    FILE* fp = popen("xsel --clipboard", "r");
+    if (!fp) {
+        perror("popen");
+        exit(1);
+    }
+    char s[1024];
+    fgets(s, sizeof(s) / sizeof(char), fp);
+    auto r = UnicodeString::fromUTF8(s);
+    pclose(fp);
+    return r;
+}
 
-
+void initColor() {
+    if (!has_colors()) return;
+    start_color();
+    init_pair(2, COLOR_BLACK, COLOR_WHITE);
+    init_pair(1, COLOR_WHITE, COLOR_BLACK);
+}
 int main() {
+    Mode mode = Mode::Russian;
+    icu::UnicodeString res;// = icu::UnicodeString::fromUTF8(s);
+    std::string out;
+    int cursor = res.length();
+    atexit([] { endwin(); });
+
     setlocale(LC_ALL, "");
     signal(SIGINT, [](int) { endwin(); exit(0); });
 
@@ -119,32 +181,37 @@ int main() {
     //nodelay(stdscr, true);
     meta(stdscr, true);
     //curs_set(0);
-    if (has_colors()) {
-        start_color();
-    }
-    int c = 0;
-    int cursor = 0;
-    Mode mode = Mode::Russian;
-    std::string res;
-    std::string out;
+    initColor();
 
     updateScreen(cursor, res, out, mode);
+    int c = 0;
+    bool escape = false;
+    //int i = 4;
     while ((c = getch())) {
+        if (escape) {
+            if (c >= '0' && c <= '0'+ Mode::LEN) {
+                mode = Mode(c- '0'-1);
+            }
+            escape = false;
+            updateScreen(cursor, res, out, mode);
+            continue;
+        }
         //endwin();
         //printf("'%c' %d\n", c, c);
+        //mvprintw(i++, 0, "'%c' %d\n", c, c);
         switch (c) {
-        case KEY_ENTER:
         case 27: // esc
-            endwin();
-            return 0;
+            escape = true;
+            continue;
+        case KEY_ENTER:
         case 13: // enter
             endwin();
-            writeClip(out.c_str());
+            if (out.size()) writeClip(out.c_str());
             return 0;
-        case KEY_UP:
+        case KEY_DOWN:
             mode = Mode(mode == 0 ? (Mode::LEN - 1) : (mode - 1));
             break;
-        case KEY_DOWN:
+        case KEY_UP:
             mode = Mode(mode + 1);
             if (mode == Mode::LEN) mode = Mode(0);
             break;
@@ -159,19 +226,27 @@ int main() {
         case CTRL(KEY_LEFT):
             cursor = 0;
             break;
+        case CTRL('v'): {
+            auto tmp = readClip();
+            res.insert(cursor, tmp);
+            cursor += tmp.length();
+        } break;
         case CTRL(KEY_RIGHT):
             cursor = res.length();
             break;
 
         case KEY_BACKSPACE:
             if (--cursor >= 0)
-                res.erase(res.begin() + cursor);
+                res.remove(cursor, 1);
+                //res.erase(res.begin() + cursor);
             else cursor = 0;
             break;
+        case 410: break;
         default:
             if (ispunct(c) || isalnum(c) || c==' ') {
-                res.insert(res.begin() + cursor++, c);
-            }
+                //res.insert(res.begin() + cursor++, c);
+                res.insert(cursor++, c);
+            } else continue;
             break;
         }
         updateScreen(cursor, res, out, mode);
