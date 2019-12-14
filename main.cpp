@@ -60,7 +60,7 @@ void drawTopBar(Mode mode) {
     //vline(' ', modeStrLength* Mode::LEN);
     for (int i = 0; i < Mode::LEN; ++i) {
         auto& s = modeDatas[i].name;
-        int left = (modeStrLength+ s.size())/2 - 3;//; + s.size();
+        int left = (modeStrLength+ s.size())/2 - 2;//; + s.size();
         attron(COLOR_PAIR(1));
         mvprintw(0, i * modeStrLength, "|");
         attron(COLOR_PAIR(1 + (i == mode)));
@@ -82,10 +82,15 @@ void updateScreen(int cursor, const UnicodeString& str, std::string& out, Mode m
     UnicodeString us = str;//.copy();// icu::UnicodeString::fromUTF8(str);
 
     switch (mode) {
+    case Mode::Greek:
+    case Mode::GreekUNGEGN:
+        us.findAndReplace("w", "ω");
+        us.findAndReplace("W", "Ω");
+        break;
     case Mode::Ukrainian:
     case Mode::Russian:
-        us.findAndReplace("c", "ц");
-        us.findAndReplace("C", "Ц");
+        //us.findAndReplace("c", "ц");
+        //us.findAndReplace("C", "Ц");
         break;
     default: break;
     }
@@ -164,7 +169,7 @@ void initColor() {
     init_pair(2, COLOR_BLACK, COLOR_WHITE);
     init_pair(1, COLOR_WHITE, bg_col);
 }
-int main(int argc, int* argv[]) {
+int main(int argc, char* argv[]) {
     Mode mode = Mode::Russian;
     icu::UnicodeString res;// = icu::UnicodeString::fromUTF8(s);
     std::string out;
