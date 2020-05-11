@@ -122,9 +122,37 @@ void updateScreen(int cursor, const UnicodeString& str, std::string& out, Mode m
         us.findAndReplace("Э", "Е");
         us.findAndReplace("ё", "ио");
         us.findAndReplace("Ё", "ИО");
+        goto fall;
     case Mode::Russian:
+        fall:
         us.findAndReplace("'", "ь");
         us.findAndReplace("\"", "ъ");
+        us.findAndReplace("ż", "ж");
+        us.findAndReplace("ž", "ж");
+
+        us.findAndReplace("Ż", "Ж");
+        us.findAndReplace("Ž", "Ж");
+        us.findAndReplace("ș", "ш"); us.findAndReplace("Ș", "Ш");
+        us.findAndReplace("ś", "ш"); us.findAndReplace("Ś", "Ш");
+        us.findAndReplace("š", "щ"); us.findAndReplace("Š", "щ");
+        us.findAndReplace("ć", "ч"); us.findAndReplace("Ć", "ч");
+        us.findAndReplace("č", "ч"); us.findAndReplace("Č", "ч");
+        us.findAndReplace("c", "к");
+        us.findAndReplace("C", "К");
+
+
+        us.findAndReplace("ö", "ё");
+        us.findAndReplace("Ö", "Ё");
+        us.findAndReplace("yo", "ё");
+        us.findAndReplace("Yo", "Ё");
+        us.findAndReplace("YO", "Ё");
+        if (mode == Mode::Russian) {
+            // us.findAndReplace("H", "Х");
+            // us.findAndReplace("Kh", "Х");
+            // us.findAndReplace("KH", "Х");
+            us.findAndReplace("h", "х");
+            us.findAndReplace("kh", "х");
+        }
         break;
     default: break;
     }
@@ -169,7 +197,7 @@ void initColor() {
     init_pair(2, COLOR_BLACK, COLOR_WHITE);
     init_pair(1, COLOR_WHITE, bg_col);
 }
-int main(int argc, char* argv[]) {
+int main(int argc, char* /*argv*/[]) {
     Mode mode = Mode::Russian;
     icu::UnicodeString res;// = icu::UnicodeString::fromUTF8(s);
     std::string out;
@@ -194,9 +222,37 @@ int main(int argc, char* argv[]) {
     int c = 0;
     bool escape = false;
     int i = 4;
+
+    //TODO proper unicode <- and -> and delete
+
+    //not fully implemented with all safety guards, but it works
+    // auto getch_utf8 = [] () -> char32_t {
+    //     //for the other bytes
+    //     auto readExtra = [] { return getch() & 0b0011'1111; };
+    //     unsigned c = getch();
+    //     if (c & 0x80) {
+    //         if ((c & 0b1110'0000) == 0b1100'0000) { //110x'xxxx - 2 bytes
+    //             auto b1 = c & 0b0001'1111;
+    //             auto b2 = readExtra();
+    //             return (b1 << 6) | b2;
+    //         } else if ((c & 0b1111'0000) == 0b1110'0000) { //1110'xxxx - 3 bytes
+    //             auto b1 = c & 0b0000'1111;
+    //             auto b2 = readExtra();
+    //             auto b3 = readExtra();
+    //             return (b1 << 6*2) | (b2 << 6) | b3;
+    //         } else if ((c & 0b1111'1000) == 0b1111'0000) { //1111'0xxx - 4 bytes
+    //             auto b1 = c & 0b0000'0111;
+    //             auto b2 = readExtra();
+    //             auto b3 = readExtra();
+    //             auto b4 = readExtra();
+    //             return (b1 << 6*3) | (b2 << 6*2) | (b3 <<6) | b4;
+    //         }
+    //     }
+    //     return c;
+    // };
     while ((c = getch())) {
         if (escape) {
-            if (c >= '1' && c <= '1'+ Mode::LEN) {
+            if (c >= '1' && c <= '1' + Mode::LEN) {
                 mode = Mode(c- '1');
             }
             escape = false;
@@ -205,7 +261,7 @@ int main(int argc, char* argv[]) {
         }
         //endwin();
         if (debugMode) {
-            printf("'%c' %d\n", c, c);
+            printf("inserting '%c' %d\n", c, c);
             mvprintw(i++, 0, "'%c' %d\n", c, c);
         }
         switch (c) {
@@ -251,12 +307,37 @@ int main(int argc, char* argv[]) {
             else cursor = 0;
             break;
         case 410: break;
-        default:
-            if (ispunct(c) || isalnum(c) || c==' ') {
+        default: {
+            char32_t chr = c;
+            auto readExtra = [] { return getch() & 0b0011'1111; };
+            // c = getch();
+            if (c & 0x80) {
+                if ((c & 0b1110'0000) == 0b1100'0000) { //110x'xxxx - 2 bytes
+                    auto b1 = c & 0b0001'1111;
+                    auto b2 = readExtra();
+                    chr = (b1 << 6) | b2;
+                } else if ((c & 0b1111'0000) == 0b1110'0000) { //1110'xxxx - 3 bytes
+                    auto b1 = c & 0b0000'1111;
+                    auto b2 = readExtra();
+                    auto b3 = readExtra();
+                    chr = (b1 << 6*2) | (b2 << 6) | b3;
+                } else if ((c & 0b1111'1000) == 0b1111'0000) { //1111'0xxx - 4 bytes
+                    auto b1 = c & 0b0000'0111;
+                    auto b2 = readExtra();
+                    auto b3 = readExtra();
+                    auto b4 = readExtra();
+                    chr = (b1 << 6*3) | (b2 << 6*2) | (b3 <<6) | b4;
+                }
+            }
+            //printf("--'%x'--\n", chr);
+            c = chr;
+            if (c >= 0x20){ //ispunct(c) || isalnum(c) || c==' ') {
+            // if (ispunct(c) || isalnum(c) || c==' ') {
                 //res.insert(res.begin() + cursor++, c);
+                // printf("+\n");
                 res.insert(cursor++, c);
             } else continue;
-            break;
+        } break;
         }
         updateScreen(cursor, res, out, mode);
     }
