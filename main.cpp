@@ -1,6 +1,7 @@
 #include <curses.h>
 #include <csignal>
 #include <string>
+#include <wctype.h>
 
 #include <boost/regex/icu.hpp>
 #include <unicode/errorcode.h>
@@ -38,19 +39,27 @@ public:
 
 enum Mode {
     Russian,
-    Ukrainian,
-    Greek,
+    // Ukrainian,
+    // Greek,
+    Hiragana,
+    Katakana,
     GreekUNGEGN,
     Latin,
 
-    LEN
+    LEN,
+
+    //unused
+    Ukrainian,
+    Greek,
 };
 ModeData modeDatas[Mode::LEN] = {
     { "Russian",     "Latin-Russian/BGN" },
-    { "Ukrainian",   "Latin-Russian/BGN" },
-    { "Greek",       "Latin-Greek" },
-    { "Greek UNGEGN", "Latin-Greek/UNGEGN" },
+    // { "Ukrainian",   "Latin-Russian/BGN" },
+    //{ "Greek",       "Latin-Greek" },
+    { "Hiragana",       "Latin-Hiragana" },
+    { "Katakana",       "Latin-Katakana" },
     { "Latin",       "Russian-Latin/BGN; Greek-Latin/UNGEGN; Latin" },
+    { "Greek UNGEGN", "Latin-Greek/UNGEGN" },
 };
 
 constexpr int modeStrLength = 18;
@@ -92,6 +101,10 @@ void updateScreen(int cursor, const UnicodeString& str, std::string& out, Mode m
         //us.findAndReplace("c", "ц");
         //us.findAndReplace("C", "Ц");
         break;
+    case Mode::Katakana:
+    case Mode::Hiragana:
+        //us.findAndReplace("~", "ー");//long vowel mark
+        break;
     default: break;
     }
     modeDatas[mode].getConverter()->transliterate(us);
@@ -127,6 +140,8 @@ void updateScreen(int cursor, const UnicodeString& str, std::string& out, Mode m
         fall:
         us.findAndReplace("'", "ь");
         us.findAndReplace("\"", "ъ");
+        us.findAndReplace("â", "ъ");
+        us.findAndReplace("Â", "Ъ");
         us.findAndReplace("ż", "ж");
         us.findAndReplace("ž", "ж");
 
@@ -137,11 +152,15 @@ void updateScreen(int cursor, const UnicodeString& str, std::string& out, Mode m
         us.findAndReplace("š", "щ"); us.findAndReplace("Š", "щ");
         us.findAndReplace("ć", "ч"); us.findAndReplace("Ć", "ч");
         us.findAndReplace("č", "ч"); us.findAndReplace("Č", "ч");
-        us.findAndReplace("c", "к");
-        us.findAndReplace("C", "К");
+        us.findAndReplace("c", "ц");
+        us.findAndReplace("C", "Ц");
+        us.findAndReplace("ț", "ц");
+        us.findAndReplace("Ț", "Ц");
 
 
         us.findAndReplace("ö", "ё");
+        us.findAndReplace("ę", "э");
+        us.findAndReplace("Ę", "Э");
         us.findAndReplace("Ö", "Ё");
         us.findAndReplace("yo", "ё");
         us.findAndReplace("Yo", "Ё");
@@ -166,6 +185,7 @@ void updateScreen(int cursor, const UnicodeString& str, std::string& out, Mode m
     mvprintw(3, 0, "%s             ", out.c_str());
     move(2, cursor);
 }
+
 
 void writeClip(const char* str) {
     FILE* fp = popen(" xsel -i -b", "w");
@@ -331,7 +351,7 @@ int main(int argc, char* /*argv*/[]) {
             }
             //printf("--'%x'--\n", chr);
             c = chr;
-            if (c >= 0x20){ //ispunct(c) || isalnum(c) || c==' ') {
+            if (iswalnum(c) || iswpunct(c) || iswspace(c)) { //ispunct(c) || isalnum(c) || c==' ') {
             // if (ispunct(c) || isalnum(c) || c==' ') {
                 //res.insert(res.begin() + cursor++, c);
                 // printf("+\n");
