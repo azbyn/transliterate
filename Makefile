@@ -42,6 +42,7 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 	@$(MKDIR_P) $(dir $@)
 	@$(CXX) $(CPPFLAGS) -c $< -o $@
 
+rebuild: clean $(TARGET)
 
 .PHONY: clean
 clean:
