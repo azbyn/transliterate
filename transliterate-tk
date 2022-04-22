@@ -21,7 +21,7 @@ languages = [
     # old church slavonic
     ("OCS",         "Latin-Russian/BGN"),
 
-
+    
     ("Hiragana",    "Latin-Hiragana"),
     ("Katakana",    "Latin-Katakana"),
     ("Latin",       "Russian-Latin/BGN; Greek-Latin/UNGEGN; Latin"),
@@ -41,14 +41,32 @@ def change_language(idx):
     _transliterator = Transliterator.createInstance(languages_dict[l])
 
 
+    # TODO fix update
 def greek_pre(string):
     string = (string
-             .replace("w", "ω")
-             .replace("W", "Ω")
-             .replace("ö", "ω")
-             .replace("Ö", "Ω")
-             .replace("b", "β")
-             .replace("B", "Β")
+              .replace("w", "ω")
+              .replace("W", "Ω")
+              .replace("ö", "ω")
+              .replace("Ö", "Ω")
+              .replace("b", "β")
+              .replace("B", "Β")
+              
+              .replace("x", "ξ")
+              .replace("X", "Ξ")
+
+              .replace("ę", "η")
+              .replace("Ę", "Η")
+              
+              .replace("q", "ϙ")
+              .replace("Q", "Ϙ")
+
+              # digamma
+              .replace("Â", "Ϝ")
+              .replace("â", "ϝ")
+
+              .replace("Ł", "Ϝ")
+              .replace("ł", "ϝ")
+              
              )
     return string
 
@@ -142,7 +160,7 @@ def ocs_pre(string): #ocs is similar to ukrainian
               .replace("AE", "Ѣ")
               .replace("ě", "ѣ")
               .replace("Ě", "Ѣ")
-
+              
               )
     string = ukrainian_pre(string)
     string = (string
@@ -189,7 +207,7 @@ def cyrilic_post(string):
 
         .replace("â", "ы")
         .replace("Â", "Ы")
-
+              
         .replace("ż", "ж")
         .replace("ž", "ж")
         .replace("ź", "ж")
@@ -243,12 +261,12 @@ def ocs_post(string):
     string = (string
               .replace("з", "ꙁ")
               .replace("З", "Ꙁ")
-
+              
               .replace("â", "ꙑ")
               .replace("Â", "Ꙑ")
 
 
-
+              
               # .replace("ż", "з")
               # .replace("Ż", "З")
 
@@ -259,7 +277,7 @@ def ocs_post(string):
 
               .replace("є", "ѥ")
               .replace("Є", "Ѥ")
-
+              
               .replace("э", "є")
               .replace("Э", "Є")
 
@@ -272,7 +290,7 @@ def ocs_post(string):
 
 
               # ou
-
+              
               .replace("ō", "ꙋ")
               .replace("Ō", "Ꙋ")
 
@@ -284,7 +302,7 @@ def ocs_post(string):
               .replace("йą", "ѭ")
               .replace("Йą", "Ѭ")
               .replace("ЙĄ", "Ѭ")
-
+              
               .replace("ą", "ѫ")
               .replace("Ą", "Ѫ")
 
@@ -292,12 +310,12 @@ def ocs_post(string):
               .replace("йę", "ѩ")
               .replace("Йę", "ѩ")
               .replace("ЙĘ", "ѩ")
-
+              
               .replace("ę", "ѧ")
               .replace("Ę", "Ѧ")
 
 
-
+              
 
               # palatisation
               .replace("ń", "\u0484")
@@ -314,10 +332,10 @@ def ocs_post(string):
 
               .replace("?", ";")
 
+              
 
 
-
-
+                             
 
 
 
@@ -330,13 +348,8 @@ def ocs_post(string):
 def transliterate_string(input):
     lang = languages[_current_language_idx][0]
 
-    isCyrilic = (lang == "Russian" or
-                 lang == "Ukrainian" or
-                 lang == "OCS")
-
-
     if lang == "Greek":
-        input = greek_pre()
+        input = greek_pre(input)
     elif lang == "Ukrainian":
         input = ukrainian_pre(input)
     elif lang == "OCS":
